@@ -1,0 +1,152 @@
+---
+title: "Caregiver Safety Trends: Advanced Dashboard"
+author: "Harlie Lockhart"
+date: "2026-01-15"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(readxl)
+library(plotly)
+library(shiny)
+runGitHub( "<Caregiver Data Analysis - Simulated>", "<hlockhart04>")
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+
+Caregiver_Injury_Dataset <- read_excel("/Users/harlieee/Desktop/Caregiver Injury Dataset.xlsx")
+```
+
+
+# Dropdowns for Filtering the Data
+```{r}
+selectInput("unit_filter", "Select Unit:", choices = c("All", unique(Caregiver_Injury_Dataset$Unit)), selected = "All")
+selectInput("shift_filter", "Select Shift:", choices = c("All", unique(Caregiver_Injury_Dataset$Shift)), selected = "All")
+```
+
+# Reactive Filtered Dataset
+```{r}
+
+### Filters
+selectInput("unit_filter", "Select Unit:", choices = c("All", unique(Caregiver_Injury_Dataset$Unit)), selected = "All")
+selectInput("shift_filter", "Select Shift:", choices = c("All", unique(Caregiver_Injury_Dataset$Shift)), selected = "All")
+
+### Summary Metrics
+renderUI({
+  data <- filtered_data()
+  tagList(
+    div(strong("Total Incidents:"), nrow(data)),
+    div(strong("Unique Units:"), n_distinct(data$Unit)),
+    div(strong("Unique Shifts:"), n_distinct(data$Shift)),
+    div(strong("Incident Types:"), n_distinct(data$Incident_Type))
+  )
+})
+
+### Filtered Dataset Table
+renderTable({
+  filtered_data()
+})
+
+# --- Reactive filtered dataset (do NOT display this code)
+filtered_data <- reactive({
+  data <- Caregiver_Injury_Dataset
+  if (input$unit_filter != "All") {
+    data <- data %>% filter(Unit == input$unit_filter)
+  }
+  if (input$shift_filter != "All") {
+    data <- data %>% filter(Shift == input$shift_filter)
+  }
+  data
+})
+
+```
+
+# Key Performance Indicators (KPI's)
+```{r}
+renderUI({
+data <- filtered_data()
+total_incidents <- nrow(data)
+total_units <- n_distinct(data$Unit)
+total_shifts <- n_distinct(data$Shift)
+total_types <- n_distinct(data$Incident_Type)
+
+tagList(
+div(strong("Total Incidents: "), total_incidents),
+div(strong("Units Reported: "), total_units),
+div(strong("Shifts Reported: "), total_shifts),
+div(strong("Incident Types: "), total_types)
+)
+})
+```
+
+```{r}
+# Incidents by Unit
+renderPlotly({
+data <- filtered_data() %>% count(Unit)
+p <- ggplot(data, aes(x = Unit, y = n, fill = ifelse(n == max(n), "red", "gray70"))) +
+geom_col(width = 0.5) +
+labs(title = "Caregiver Safety Incidents by Unit", x = "Unit", y = "Number of Incidents") +
+scale_fill_identity() +
+theme_minimal()
+ggplotly(p)
+})
+```
+
+# Incidents by Shift
+```{r}
+renderPlotly({
+data <- filtered_data() %>% count(Shift)
+p <- ggplot(data, aes(x = Shift, y = n, fill = "gray70")) +
+geom_col(width = 0.5) +
+labs(title = "Caregiver Safety Incidents by Shift", x = "Shift", y = "Number of Incidents") +
+theme_minimal()
+ggplotly(p)
+})
+```
+
+# Most Common Incident Types
+```{r}
+renderPlotly({
+  data <- filtered_data() %>% count(Incident_Type) %>% arrange(desc(n))
+  p <- ggplot(data, aes(x = reorder(Incident_Type, n), y = n,
+                        fill = ifelse(n == max(n), "red", "gray70"))) +
+    geom_col(width = 0.5) +
+    coord_flip() +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +
+    labs(title = "Most Common Caregiver Safety Incidents", 
+         x = "Incident Type", y = "Number of Incidents") +
+    scale_fill_identity() +
+    theme_minimal()
+  
+  ggplotly(p, height = 400) %>%
+    layout(yaxis = list(autorange = TRUE),
+           margin = list(l = 100, r = 50, t = 50, b = 50))
+})
+
+
+```
+
+
+
+
+
+
+# Key Insights & Recommendations
+
+### Key Findings
+- Med-Surg units reported the highest number of incidents.
+- Night shifts had slightly more incidents, but day shifts were still high.
+- Needlesticks were the most common incident type; verbal aggression and lifting injuries tied for second.
+
+### Operational Recommendations
+- Targeted reminders and training for high-incident units and shifts.
+- Staffing adjustments and workload review for night shifts.
+- Consistent reporting supports proactive safety planning.
+
+### Ethical Disclaimer
+All data is **simulated** for illustrative purposes; no real patient or caregiver data was used.
