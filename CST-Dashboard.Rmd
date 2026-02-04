@@ -1,7 +1,6 @@
 ---
 title: "Caregiver Safety Trends: Advanced Dashboard"
 author: "Harlie Lockhart"
-date: "2026-01-15"
 output: 
   flexdashboard::flex_dashboard:
     orientation: rows
@@ -15,21 +14,82 @@ library(tidyverse)
 library(readxl)
 library(plotly)
 library(shiny)
-runGitHub( "<Caregiver Data Analysis - Simulated>", "<hlockhart04>")
+library(DT)
+
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 
 
-Caregiver_Injury_Dataset <- read_excel("/Users/harlieee/Desktop/Caregiver Injury Dataset.xlsx")
+Caregiver_Injury_Dataset <- read_excel("Caregiver Injury Dataset.xlsx")
+
+Caregiver_Injury_Dataset <- Caregiver_Injury_Dataset %>%
+  mutate(
+    Severity = case_when(
+      Incident_Type %in% c("Needlestick", "Physical Assault") ~ "Severe",
+      Incident_Type %in% c("Lifting Injury", "Slip/Fall") ~ "Moderate",
+      TRUE ~ "Low"
+    )
+  )
+
+
+DT::datatable(Caregiver_Injury_Dataset)
+
+getwd()
+
 ```
 
 
-# Dropdowns for Filtering the Data
-```{r}
-selectInput("unit_filter", "Select Unit:", choices = c("All", unique(Caregiver_Injury_Dataset$Unit)), selected = "All")
-selectInput("shift_filter", "Select Shift:", choices = c("All", unique(Caregiver_Injury_Dataset$Shift)), selected = "All")
-```
+# Overview
 
-# Reactive Filtered Dataset
+## Caregiver Safety Trends Dashboard
+
+### Purpose
+This dashboard explores **simulated caregiver safety incident data** to identify patterns across:
+- Hospital units
+- Work shifts
+- Incident types
+
+The goal is to support **proactive safety planning**, staffing awareness, and training prioritization.
+
+---
+
+### How to Use This Dashboard
+- Navigate to the **Interactive Insights** tab to filter incidents by unit and shift.
+- KPIs and visualizations will update dynamically based on your selections.
+- Use the insights to identify high-risk areas and trends.
+
+---
+
+### Ethical & Data Disclaimer
+- All data shown is **simulated** and used for educational purposes only.
+- No real patient or caregiver information is included.
+- Trends are illustrative, not diagnostic.
+
+---
+
+### Author
+**Harlie Lockhart**  
+University of Arkansas
+Data Science (Biomedical & Healthcare Informatics)
+Minor in Medical Humanities
+
+---
+
+### Contact & Feedback
+Questions, feedback, or recommendations related to caregiver safety and dashboard design are welcome.
+
+📧 **Email:** [harliel@uark.edu](mailto:harliel@uark.edu)
+
+---
+
+### Use & Copyright Notice
+© 2026 **Harlie Lockhart**. All rights reserved.
+
+This dashboard and its contents are intended for **educational use only**.  
+Reproduction, redistribution, or reuse of this material without permission is not allowed.
+
+
+# Interactive Insights
+
 ```{r}
 
 ### Filters
@@ -43,7 +103,8 @@ renderUI({
     div(strong("Total Incidents:"), nrow(data)),
     div(strong("Unique Units:"), n_distinct(data$Unit)),
     div(strong("Unique Shifts:"), n_distinct(data$Shift)),
-    div(strong("Incident Types:"), n_distinct(data$Incident_Type))
+    div(strong("Incident Types:"), n_distinct(data$Incident_Type)),
+    div(strong("Severity Levels:"), n_distinct(data$Severity))
   )
 })
 
@@ -52,7 +113,7 @@ renderTable({
   filtered_data()
 })
 
-# --- Reactive filtered dataset (do NOT display this code)
+# --- Reactive filtered dataset 
 filtered_data <- reactive({
   data <- Caregiver_Injury_Dataset
   if (input$unit_filter != "All") {
@@ -67,6 +128,7 @@ filtered_data <- reactive({
 ```
 
 # Key Performance Indicators (KPI's)
+
 ```{r}
 renderUI({
 data <- filtered_data()
@@ -74,12 +136,14 @@ total_incidents <- nrow(data)
 total_units <- n_distinct(data$Unit)
 total_shifts <- n_distinct(data$Shift)
 total_types <- n_distinct(data$Incident_Type)
+total_severity <- n_distinct(data$Severity)
 
 tagList(
 div(strong("Total Incidents: "), total_incidents),
 div(strong("Units Reported: "), total_units),
 div(strong("Shifts Reported: "), total_shifts),
-div(strong("Incident Types: "), total_types)
+div(strong("Incident Types: "), total_types),
+div(strong("Severity Levels: "), total_severity)
 )
 })
 ```
@@ -98,6 +162,7 @@ ggplotly(p)
 ```
 
 # Incidents by Shift
+
 ```{r}
 renderPlotly({
 data <- filtered_data() %>% count(Shift)
@@ -106,10 +171,15 @@ geom_col(width = 0.5) +
 labs(title = "Caregiver Safety Incidents by Shift", x = "Shift", y = "Number of Incidents") +
 theme_minimal()
 ggplotly(p)
+ggplotly(p, height = 500) %>%
+    layout(yaxis = list(autorange = TRUE),
+           margin = list(l = 150, r = 100, t = 100, b = 100))
 })
+
 ```
 
 # Most Common Incident Types
+
 ```{r}
 renderPlotly({
   data <- filtered_data() %>% count(Incident_Type) %>% arrange(desc(n))
@@ -132,21 +202,59 @@ renderPlotly({
 ```
 
 
+# Severity Analysis 
 
+```{r}
+selectInput(
+  "severity_filter",
+  "Select Severity Level:",
+  choices = c("All", unique(Caregiver_Injury_Dataset$Severity)),
+  selected = "All"
+)
 
+severity_data <- reactive({
+  data <- Caregiver_Injury_Dataset
+  if (input$severity_filter != "All") {
+    data <- data %>% filter(Severity == input$severity_filter)
+  }
+  data
+})
 
+renderPlotly({
+  data <- severity_data() %>% count(Unit, Severity)
+  p <- ggplot(data, aes(x = Unit, y = n, fill = Severity)) +
+    geom_col() +
+    labs(
+      title = "Incidents by Unit and Severity",
+      x = "Unit",
+      y = "Number of Incidents"
+    ) +
+    theme_minimal()
+  ggplotly(p, height = 400) %>%
+    layout(yaxis = list(autorange = TRUE),
+           margin = list(l = 100, r = 50, t = 50, b = 50))
+})
+  
+```
 
 # Key Insights & Recommendations
 
 ### Key Findings
-- Med-Surg units reported the highest number of incidents.
-- Night shifts had slightly more incidents, but day shifts were still high.
-- Needlesticks were the most common incident type; verbal aggression and lifting injuries tied for second.
+
+-   Med-Surg units reported the highest number of incidents.
+-   Night shifts had slightly more incidents, but day shifts were still high.
+-   Needlesticks were the most common incident type; verbal aggression and lifting injuries tied for second.
 
 ### Operational Recommendations
-- Targeted reminders and training for high-incident units and shifts.
-- Staffing adjustments and workload review for night shifts.
-- Consistent reporting supports proactive safety planning.
+
+-   Targeted reminders and training for high-incident units and shifts.
+-   Staffing adjustments and workload review for night shifts.
+-   Consistent reporting supports proactive safety planning.
 
 ### Ethical Disclaimer
+
 All data is **simulated** for illustrative purposes; no real patient or caregiver data was used.
+
+
+
+
